@@ -1,0 +1,14 @@
+{
+    "require": {
+        "slim/slim": "2.*"
+    },
+
+  "require" : {
+    "mashape/unirest-php" : "dev-master"
+  },
+
+  "autoload": {
+    "psr-0": {"Unirest": "lib/"}
+  }
+}
+
