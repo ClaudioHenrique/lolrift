@@ -19,7 +19,8 @@
 	$app = new \Slim\Slim();
 
 	$app->get('/', function () {
-		echo 'Hello! Welcome to our API (: ';
+		echo 'Hello! Welcome to our API (: <br><br> LolRift Team: <br> Cláudio Henrique (Developer) <br> Antero Junior (Gamer)
+		';
 	});
 
 	$app->get('/contato', function () {
@@ -35,7 +36,8 @@
 	$app->get('/getLeague/',function() {
 
 		echo 'Olá, envie uma requisição utilizando o METODO POST passando como parametro o SummonersIds dos jogadores no seguinte formato : <br><br>';
-		echo '<pre>';
+		echo "<pre>";
+
 		print_r(
 			"
 					[
@@ -149,9 +151,20 @@
 		$internalName = array();
 		$champions = array();
 
+        /**
+         * Removo os espaços em branco caso exista no Sumonnor name do cara
+         */
+
+        $nomeFormatado = '';
+
+        $namePlayer = explode(' ',$namePlayer);
+
+        for($i = 0; $i < sizeof($namePlayer); $i++){
+            $nomeFormatado .= $namePlayer[$i];
+        }
 
 
-		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$namePlayer",
+		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$nomeFormatado",
 				array(
 					"X-Mashape-Key" => "WDdDYHuqYLmshznB011K61QDTA4Ip1MHzOIjsnS4BgktTVXiub"
 				)
@@ -159,8 +172,6 @@
 
 		$json = json_decode(json_encode($response->body),true);	
 
-		//echo '<pre>';
-		//print_r($json);
 
 		if(!isset($json['data']['error'])){
 
@@ -195,7 +206,12 @@
 			echo '<pre>';
 			print_r($champions);
 
-		}
+		}else{
+            echo json_encode(array(
+                "status" => "404",
+                "mensagem" => "Eastamos com problema na utilização da API"
+            ));
+        }
 
 
 	}
@@ -244,17 +260,23 @@
 
 		$response = Unirest::get("https://br.api.pvp.net/api/lol/br/v2.5/league/by-summoner/$ids?api_key=$key");
 
+
 		if(!empty($response)){
-			$json = json_decode(json_encode($response->body),true);	
+
+
+			$json = json_decode(json_encode($response->body),true);
 			$x = 0;
 
 			for($i = 0; $i < sizeof($data); $i++) {
 
 				//Aqui eu busco as principais informações de todos os jogadores
 				foreach($json[$data[$i]['id']][0]['entries'] as $key => $value){
+                      $tier = $json[$data[$i]['id']][0]['tier'];
+
 				      if($value['playerOrTeamId'] == $data[$i]['id']){
 
 				      		$leagues[$x] = array (
+                                    'tier' => $tier,
 				      				'playerOrTeamId' => $value['playerOrTeamId'],
 				      				'playerOrTeamName' => $value['playerOrTeamName'],
 				      				'division' => $value['division'],
@@ -269,6 +291,7 @@
 				      		$x++;
 				      }
 				}
+
 			}
 			print_r($leagues);
 		}
@@ -306,15 +329,13 @@
 		$z = 0;
 		$x = 0;
 
-		
-		echo '<pre>';
+
 		preg_match_all('~\'[^\']++\'|\([^)]++\)|[^,]++~', $ids,$result); // Separo todos os ids para busca
-		print_r($result);
 
 
 		$response = Unirest::get("https://br.api.pvp.net/api/lol/br/v1.4/summoner/$ids/masteries/?api_key=$key");
 		$json = json_decode(json_encode($response->body),true);	
-
+        
 
 		for($v = 0; $v < sizeof($result[0]); $v++){
 
@@ -376,11 +397,8 @@
 						}
 					}
 
-					echo sizeof($mt[$atual]) - 1;
 
 					if($i == sizeof($mt[$atual]) - 1 ){
-
-						/*
 						$info[$x] = array(
 							"name" => $json[$idPlay]['pages'][0]['name'],
 							"id" => $idPlay,
@@ -389,9 +407,7 @@
 							"offense" => $offense
 						);
 						$x++;
-						*/
 
-						echo sizeof($mt[$atual]);
 					}
 					
 					
@@ -404,8 +420,7 @@
 		
 	}
 		echo '<pre>';
-		print_r($mt);
-		
+        print_r($info);
 	}
 
 	$app->run();
