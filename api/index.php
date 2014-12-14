@@ -5,12 +5,13 @@
 	* @email: claudiohenriquedev@gmail.com
 	* @about: Essa API recupera informações de uma partida que esta sendo jogando em LoL, obtendo informações de todos os jogadores
 	* @return: Toda a aplicação retorna as informações utilizando JSON
-	* @date: 17/11/2014
+	* @date: 17/11/2014 - 13/12/2014
+	* @Message: Apenas os métodos getLeague() e getMasteriesPoints() é que recebem requisições POST, consultar o método para verificar a forma de efetuar essas requisições.
 	*/
-	
 
 	include_once ('../vendor/autoload.php');
 	include_once('../vendor/unirest-php-1.2.1/lib/Unirest.php');
+    include_once('lib/simple_html_dom.php');
 
 	\Slim\Slim::registerAutoloader();
 
@@ -18,21 +19,22 @@
 
 	$app = new \Slim\Slim();
 
-	$app->get('/', function () {
-		echo 'Hello! Welcome to our API (: <br><br> LolRift Team: <br> Cláudio Henrique (Developer) <br> Antero Junior (Gamer)
-		';
+    $app->post('/getMasteriesPoints/', 'getMasteriesPoints');
+    $app->post('/getLeague/', 'getLeague');
+    $app->post('/getChampion/', 'getChampion');
+    $app->post('/getNameChampion/','getNameChampion');
+
+    $app->get('/', function () {
+		echo 'Hello! Welcome to our API (: <br><br> LolRift Team: <br> Cláudio Henrique (Developer) <br> Antero Junior (Gamer)';
 	});
 
 	$app->get('/contato', function () {
 		echo 'Hi, our e-mail: hello@lolrift.com.br';
 	});
 
+    $app->get('/getRanked/:id/:name/','getRanked');
 	$app->get('/getSummonersIds/:name/', 'getSummonersIds');
 	$app->get('/getSummonersNames/:name/', 'getSummonersName');
-	$app->post('/getLeague/', 'getLeague');
-	$app->get('/getChampion/:name/', 'getChampion');
-	$app->post('/getMasteriesPoints/', 'getMasteriesPoints');
-
 	$app->get('/getLeague/',function() {
 
 		echo 'Olá, envie uma requisição utilizando o METODO POST passando como parametro o SummonersIds dos jogadores no seguinte formato : <br><br>';
@@ -54,11 +56,24 @@
 
 	});
 
+
 	//Recuper o nome de todos os jogadores da partida atual
 	function getSummonersName($namePlayer){
 		$names = array();
 
-		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$namePlayer",
+        /**
+         * Removo os espaços em branco caso exista no Sumonnor name do cara
+         */
+
+        $nomeFormatado = '';
+
+        $namePlayer = explode(' ',$namePlayer);
+
+        for($i = 0; $i < sizeof($namePlayer); $i++){
+            $nomeFormatado .= $namePlayer[$i];
+        }
+
+		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$nomeFormatado   ",
 				array(
 					"X-Mashape-Key" => "WDdDYHuqYLmshznB011K61QDTA4Ip1MHzOIjsnS4BgktTVXiub"
 				)
@@ -101,7 +116,20 @@
 		
 		$ids = array();
 
-		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$namePlayer",
+        /**
+         * Removo os espaços em branco caso exista no Sumonnor name do cara
+         */
+
+        $nomeFormatado = '';
+
+        $namePlayer = explode(' ',$namePlayer);
+
+        for($i = 0; $i < sizeof($namePlayer); $i++){
+            $nomeFormatado .= $namePlayer[$i];
+        }
+
+
+		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$nomeFormatado",
 				array(
 					"X-Mashape-Key" => "WDdDYHuqYLmshznB011K61QDTA4Ip1MHzOIjsnS4BgktTVXiub"
 				)
@@ -109,9 +137,6 @@
 
 		$json = json_decode(json_encode($response->body),true);	
 
-		echo '<pre>';
-		print_r($json);
-		echo '</pre>';
 
 		if(!isset($json['data']['error'])){
 			if(!empty($json['data']['game'])){
@@ -145,76 +170,112 @@
 	
 	}
 
-
-	function getChampion($namePlayer){
+	function getChampion(){
 
 		$internalName = array();
 		$champions = array();
-
-        /**
-         * Removo os espaços em branco caso exista no Sumonnor name do cara
-         */
-
         $nomeFormatado = '';
+        $formatado = '';
+        $todosNomes = '';
 
-        $namePlayer = explode(' ',$namePlayer);
 
-        for($i = 0; $i < sizeof($namePlayer); $i++){
-            $nomeFormatado .= $namePlayer[$i];
+        global $app;
+        $request = $app->request();
+        $data = json_decode($request->getBody(),true);
+
+        for($i = 0; $i < sizeof($data); $i++){
+            if($i == sizeof($data) - 1) {
+                $nomeFormatado .= $data[$i]['nome'];
+            }else{
+                $nomeFormatado .= $data[$i]['nome'].",";
+            }
         }
 
+        $novo = explode(',',$nomeFormatado);
 
-		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$nomeFormatado",
-				array(
-					"X-Mashape-Key" => "WDdDYHuqYLmshznB011K61QDTA4Ip1MHzOIjsnS4BgktTVXiub"
-				)
-		);
-
-		$json = json_decode(json_encode($response->body),true);	
-
-
-		if(!isset($json['data']['error'])){
-
-			$i = 0;
-
-			foreach($json['data']['game']['teamTwo'] as $teamTwo){
-				$internalName[$i] =  $teamTwo['summonerInternalName'];
-				$i++;
-			}
-
-			foreach($json['data']['game']['teamOne'] as $teamOne){
-				$internalName[$i] = $teamOne['summonerInternalName'];
-				$i++;
-			}
-
-			$i = 0;
-
-
-			for($i = 0; $i < sizeof($json['data']['game']['playerChampionSelections']); $i++){
-		     	for($j = 0; $j < sizeof($json['data']['game']['playerChampionSelections']); $j++){
-		     		if(strcmp($internalName[$i], $json['data']['game']['playerChampionSelections'][$j]['summonerInternalName']) == 0) {
-		     			$champions[$i] = array(
-		     				"summonerInternalName" => $json['data']['game']['playerChampionSelections'][$j]['summonerInternalName'],
-		     				"spell2Id" => $json['data']['game']['playerChampionSelections'][$j]['spell2Id'],
-		     				"spell1Id" => $json['data']['game']['playerChampionSelections'][$j]['spell1Id'],
-		     				"championId" => $json['data']['game']['playerChampionSelections'][$j]['championId']
-		     			);
-		     		}
-		     	}
-			}
-
-			echo '<pre>';
-			print_r($champions);
-
-		}else{
-            echo json_encode(array(
-                "status" => "404",
-                "mensagem" => "Eastamos com problema na utilização da API"
-            ));
+        for($i = 0; $i < sizeof($novo); $i++){
+            $x = explode(' ',$novo[$i]);
+            if(count($x) > 1) {
+               for($j = 0; $j < sizeof($x); $j++){
+                   $formatado .= $x[$j];
+               }
+            }else{
+                $formatado .= $novo[$i];
+            }
+            $formatado = $formatado . ',';
         }
 
+        $formatado = explode(',',$formatado);
 
-	}
+        for($i = 0; $i < sizeof($formatado)-1; $i++){
+
+           $name = $formatado[$i];
+
+            $response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$name",
+                    array(
+                        "X-Mashape-Key" => "WDdDYHuqYLmshznB011K61QDTA4Ip1MHzOIjsnS4BgktTVXiub"
+                    )
+            );
+
+            $json = json_decode(json_encode($response->body),true);
+
+            if(!isset($json['data']['error'])){
+
+                $i = 0;
+
+                foreach($json['data']['game']['teamOne'] as $teamOne){
+                    $internalName['teamone'][$i] =  $teamOne['summonerInternalName'];
+                    $i++;
+                }
+
+                $i = 0;
+
+                foreach($json['data']['game']['teamTwo'] as $teamTwo){
+                    $internalName['teamtwo'][$i] =  $teamTwo['summonerInternalName'];
+                    $i++;
+                }
+
+
+                for($i = 0; $i < sizeof($internalName['teamone']); $i++){
+                    for($j = 0; $j < sizeof($json['data']['game']['playerChampionSelections']); $j++){
+                        if(strcmp($internalName['teamone'][$i], $json['data']['game']['playerChampionSelections'][$j]['summonerInternalName']) == 0){
+                            $champions['teamOne'][$i] = array(
+                                "summonerInternalName" => $json['data']['game']['playerChampionSelections'][$j]['summonerInternalName'],
+                                "spell2Id" => $json['data']['game']['playerChampionSelections'][$j]['spell2Id'],
+                                "spell1Id" => $json['data']['game']['playerChampionSelections'][$j]['spell1Id'],
+                                "championId" => $json['data']['game']['playerChampionSelections'][$j]['championId']
+                            );
+                        }
+                    }
+                }
+
+
+                for($i = 0; $i < sizeof($internalName['teamtwo']); $i++){
+                    for($j = 0; $j < sizeof($json['data']['game']['playerChampionSelections']); $j++){
+                        if(strcmp($internalName['teamtwo'][$i], $json['data']['game']['playerChampionSelections'][$j]['summonerInternalName']) == 0){
+                            $champions['teamTwo'][$i] = array(
+                                "summonerInternalName" => $json['data']['game']['playerChampionSelections'][$j]['summonerInternalName'],
+                                "spell2Id" => $json['data']['game']['playerChampionSelections'][$j]['spell2Id'],
+                                "spell1Id" => $json['data']['game']['playerChampionSelections'][$j]['spell1Id'],
+                                "championId" => $json['data']['game']['playerChampionSelections'][$j]['championId']
+                            );
+                        }
+                    }
+                }
+
+
+            }else{
+                echo json_encode(array(
+                    "status" => "404",
+                    "mensagem" => "Eastamos com problema na utilização da API"
+                ));
+
+            }
+        }
+
+        echo '<pre>';
+        print_r($champions);
+    }
 
 	function getLeague(){
 		//Recebe a requisição com os SummonersIds de todos os jogadores da partida
@@ -298,7 +359,6 @@
 
 	}
 
-
 	function getMasteriesPoints(){
 		//Materies 
 		$mt = array();
@@ -335,7 +395,7 @@
 
 		$response = Unirest::get("https://br.api.pvp.net/api/lol/br/v1.4/summoner/$ids/masteries/?api_key=$key");
 		$json = json_decode(json_encode($response->body),true);	
-        
+
 
 		for($v = 0; $v < sizeof($result[0]); $v++){
 
@@ -422,6 +482,91 @@
 		echo '<pre>';
         print_r($info);
 	}
+
+     /*
+     * Informo o id do Campeão e me retorna o Nome do campeão!
+     * */
+
+    function getNameChampion(){
+            //Recebo a Requisição
+            global $app;
+            $request = $app->request();
+            $data = json_decode($request->getBody(),true);
+
+            $ids = "";
+
+            for($i = 0; $i < sizeof($data); $i++){
+                if($i == sizeof($data) - 1) {
+                    $ids .= $data[$i]['id'];
+                }else{
+                    $ids .= $data[$i]['id'].",";
+                }
+            }
+
+
+            $champions = file_get_contents('static/champions.json');
+            $champ = json_decode($champions,true);
+
+            preg_match_all('~\'[^\']++\'|\([^)]++\)|[^,]++~', $ids,$result); // Separo todos os ids para busca
+
+            echo '<pre>';
+            print_r($result);
+
+            foreach($champ['data'] as $key => $value){
+                echo $champ['data'][$key]['name'].'<br>';
+            }
+    }
+
+    //Verifico se o player esta rankeado, informando o nome do seu melhor campeão e o nome do jogador
+    function getRanked($idChampion, $namePlayer){
+        //Status do rankeamento
+        $ranked = false;
+        $math = 0;
+
+        //URL responsavel por retornar as informações do Rank do Brasil
+        $html = file_get_html("http://www.lolskill.net/top?filterChampion=$idChampion&filterRealm=BR");
+        //Magia negra responsavel por recuperar a quantidade de páginas da URL
+        preg_match_all('/<div class=\"pagination\">(.*?)<\/div>/s',$html,$matches);
+        $x = strip_tags($matches[0][0]);
+        $position = strpos($x,"N"); //Recupero a quantidade de páginas
+
+        $nicks[0] = getNickPlayers($html);
+
+        #Responsavel por acessar as páginas internas da pesquisa
+        for($i = 1; $i <= $position; $i++){
+            if($i != 1){
+                $size = sizeof($nicks);
+                $html = file_get_html("http://www.lolskill.net/top?filterChampion=$idChampion&filterRealm=BR&p=$i");
+                $nicks[$i-1] = getNickPlayers($html);
+            }
+        }
+
+        #Verifico se o nome do player existe no Ranking
+        for($i = 0; $i < sizeof($nicks); $i++){
+            for($j = 0; $j < sizeof($nicks[$i]); $j++){
+                for($w = 0; $w < sizeof($nicks[$i][$j]); $w++){
+                    $n = $nicks[$i][$j][$w];
+                    if(strcmp(strip_tags($n),$namePlayer) == 0){
+                        $ranked = true;
+                        if($i == 0) {
+                            $math =  $w+1;
+                        }else{
+                            $math = (($i * 30) + $w) + 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        echo $math;
+
+    }
+
+    function getNickPlayers($html){
+        //Magia negra responsavel por recuperar o nick dos campeões para efetuar verificação.
+        preg_match_all('/<td class=\"summoner left\">(.*?)<\/td>/s',$html,$matches);
+        return $matches;
+    }
 
 	$app->run();
 ?>
