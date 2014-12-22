@@ -5,7 +5,7 @@
 	* @email: claudiohenriquedev@gmail.com
 	* @about: Essa API recupera informações de uma partida que esta sendo jogando em LoL, obtendo informações de todos os jogadores
 	* @return: Toda a aplicação retorna as informações utilizando JSON
-	* @date: 17/11/2014 - 13/12/2014
+	* @date: 17/11/2014 - 15/12/2014
 	* @Message: Apenas os métodos getLeague() e getMasteriesPoints() é que recebem requisições POST, consultar o método para verificar a forma de efetuar essas requisições.
 	*/
 
@@ -52,69 +52,15 @@
 					]
 			"
 			);
-		echo '</pre>';
 
 	});
+    $app->get('/getKda/:id/', 'getKda');
+    $app->get('/getWins/:id/','getWins');
 
 
 	//Recuper o nome de todos os jogadores da partida atual
 	function getSummonersName($namePlayer){
 		$names = array();
-
-        /**
-         * Removo os espaços em branco caso exista no Sumonnor name do cara
-         */
-
-        $nomeFormatado = '';
-
-        $namePlayer = explode(' ',$namePlayer);
-
-        for($i = 0; $i < sizeof($namePlayer); $i++){
-            $nomeFormatado .= $namePlayer[$i];
-        }
-
-		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$nomeFormatado   ",
-				array(
-					"X-Mashape-Key" => "WDdDYHuqYLmshznB011K61QDTA4Ip1MHzOIjsnS4BgktTVXiub"
-				)
-		);
-
-		$json = json_decode(json_encode($response->body),true);	
-
-		if(!isset($json['data']['error'])){
-			if(!empty($json['data']['game'])){
-
-					$i = 0;
-
-					foreach($json['data']['game']['teamOne'] as $teamOne){
-						$names['teamOne'][$i] =  $teamOne['summonerName'];
-						$i++;
-					}
-
-
-					$i = 0;
-					foreach($json['data']['game']['teamTwo'] as $teamTwo){
-						$names['teamTwo'][$i] = $teamTwo['summonerName'];
-						$i++;
-					}
-
-					echo '<pre>';
-					print_r($names);
-			}
-		}else{
-			echo json_encode(
-				array(
-					"status" => 404	
-				)
-			);
-		}
-
-	}
-
-	//Informo o nome do Jogador (Player) e recupero os SummonersIds de todos os Players da partida
-	function getSummonersIds($namePlayer){
-		
-		$ids = array();
 
         /**
          * Removo os espaços em branco caso exista no Sumonnor name do cara
@@ -135,8 +81,68 @@
 				)
 		);
 
-		$json = json_decode(json_encode($response->body),true);	
+		$json = json_decode(json_encode($response->body),true);
 
+
+		if(!isset($json['data']['error'])){
+			if(!empty($json['data']['game'])){
+
+					$i = 0;
+
+					foreach($json['data']['game']['teamOne'] as $teamOne){
+						$names['teamOne'][$i] =  $teamOne['summonerName'];
+						$i++;
+					}
+
+
+					$i = 0;
+					foreach($json['data']['game']['teamTwo'] as $teamTwo){
+						$names['teamTwo'][$i] = $teamTwo['summonerName'];
+						$i++;
+					}
+
+			}
+		}else{
+			echo json_encode(
+				array(
+					"status" => 404	
+				)
+			);
+		}
+
+        return $names;
+
+	}
+
+	//Informo o nome do Jogador (Player) e recupero os SummonersIds de todos os Players da partida
+	function getSummonersIds($namePlayer){
+		
+		$ids = array();
+
+        /**
+         * Removo os espaços em branco caso exista no Sumonnor name do cara
+         */
+
+        $nomeFormatado = '';
+
+        $namePlayer = explode(' ',$namePlayer);
+
+        for($i = 0; $i < sizeof($namePlayer); $i++){
+            $nomeFormatado .= $namePlayer[$i];
+        }
+
+        $nomes = getSummonersName($nomeFormatado);
+        echo '<pre>';
+        print_r($nomes);
+
+
+		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$nomeFormatado",
+				array(
+					"X-Mashape-Key" => "WDdDYHuqYLmshznB011K61QDTA4Ip1MHzOIjsnS4BgktTVXiub"
+				)
+		);
+
+		$json = json_decode(json_encode($response->body),true);
 
 		if(!isset($json['data']['error'])){
 			if(!empty($json['data']['game'])){
@@ -507,7 +513,7 @@
             $champions = file_get_contents('static/champions.json');
             $champ = json_decode($champions,true);
 
-            preg_match_all('~\'[^\']++\'|\([^)]++\)|[^,]++~', $ids,$result); // Separo todos os ids para busca
+            preg_match_all('~\'[^\']++\'|\([^)]++\)|[^,]++~', $ids,$result); // Separo todos os ids para a busca
 
             echo '<pre>';
             print_r($result);
@@ -521,6 +527,7 @@
     function getRanked($idChampion, $namePlayer){
         //Status do rankeamento
         $ranked = false;
+        //Caso o jogador esteja listado no ranking, essa váriavel armazena a sua posição! :)
         $math = 0;
 
         //URL responsavel por retornar as informações do Rank do Brasil
@@ -558,8 +565,67 @@
             }
         }
 
-        echo $math;
+        //Verifico de o player foi rankeado
+        if($ranked){
+            echo json_encode(
+                array(
+                    "ranked" => true,
+                    "position" => $math
+                )
+            );
+        }else{
+            echo json_encode(
+                array(
+                    "ranked" => false
+                )
+            );
+        }
 
+
+    }
+
+    function getKda($idPlayer,$idChamp){
+        $key = $GLOBALS['key'];
+        if(!empty($idPlayer) && !empty($idChamp)){
+            $html = file_get_html("https://br.api.pvp.net/api/lol/br/v2.2/matchhistory/$idPlayer?championIds=$idChamp&rankedQueues=RANKED_SOLO_5x5&api_key=$key");
+        }else{
+            echo json_encode(
+                array(
+                    "status" => 404,
+                    "mensagem" => "Forneeca todos os parametros, id do player e id do campeão"
+                )
+            );
+        }
+
+    }
+
+    function getWins($idPlayer){
+        $key = $GLOBALS['key'];
+        $normalWins = 0;
+        $soloWins = 0;
+        $teamWins = 0;
+        $teamLosses = 0;
+
+        if(!empty($idPlayer)) {
+            $html = file_get_html("https://br.api.pvp.net/api/lol/br/v1.3/stats/by-summoner/$idPlayer/summary?season=SEASON4&api_key=$key");
+            $json = json_decode($html, true);
+            for ($i = 0; $i < sizeof($json['playerStatSummaries']); $i++) {
+                if ($json['playerStatSummaries'][$i]['playerStatSummaryType'] == 'Unranked') {
+                    $normalWins = $normalWins + $json['playerStatSummaries'][$i]['wins'];
+                }
+
+                if ($json['playerStatSummaries'][$i]['playerStatSummaryType'] == 'RankedSolo5x5') {
+                    $soloWins = $soloWins +  $json['playerStatSummaries'][$i]['wins'];
+                }
+
+                if ($json['playerStatSummaries'][$i]['playerStatSummaryType'] == 'RankedTeam5x5') {
+                    $teamWins = $teamWins + $json['playerStatSummaries'][$i]['wins'];
+                    $teamLosses = $teamLosses + $json['playerStatSummaries'][$i]['losses'];
+                }
+            }
+
+
+        }
     }
 
     function getNickPlayers($html){
