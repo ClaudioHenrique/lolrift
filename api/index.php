@@ -15,7 +15,7 @@
 
 	\Slim\Slim::registerAutoloader();
 
-	$GLOBALS['key'] = 'bbb704d4-1628-41cc-a596-6359cb50ad30'; //Key do riotgames.com
+	$GLOBALS['key'] = 'a6cdd4b0-ac93-44d9-aada-7cf8c93d38ae'; //Key do riotgames.com
 
 	$app = new \Slim\Slim();
 
@@ -54,7 +54,7 @@
 			);
 
 	});
-    $app->get('/getKda/:id/', 'getKda');
+    $app->get('/getRankedStats/:idPlayer/', 'getRankedStats');
     $app->get('/getWins/:id/','getWins');
 
 
@@ -176,6 +176,7 @@
 	
 	}
 
+    //Inforomo o nome do Player e recupero o seu melhor campeão
 	function getChampion(){
 
 		$internalName = array();
@@ -584,10 +585,54 @@
 
     }
 
-    function getKda($idPlayer,$idChamp){
+    function getRankedStats($idPlayer){
+
+        $totalGames = 0;
+        $totalWins = 0;
+        $totalLoss = 0;
+        $totalKill = 0;
+        $totalDeath = 0;
+        $totalAssist = 0;
+
+
         $key = $GLOBALS['key'];
         if(!empty($idPlayer) && !empty($idChamp)){
-            $html = file_get_html("https://br.api.pvp.net/api/lol/br/v2.2/matchhistory/$idPlayer?championIds=$idChamp&rankedQueues=RANKED_SOLO_5x5&api_key=$key");
+            $html = file_get_html("https://br.api.pvp.net/api/lol/br/v1.3/stats/by-summoner/$idPlayer/ranked?season=SEASON4&api_key=$key");
+            $array = json_decode($html,true);
+            //echo '<pre>';
+            //print_r($array);
+
+            for($i = 0; $i < sizeof($array['champions']); $i++){
+
+                $totalGames = $totalGames + $array['champions'][$i]['stats']['totalSessionsPlayed']; //Quantidade de partidas jogadas
+                $totalWins = $totalWins + $array['champions'][$i]['stats']['totalSessionsWon']; //Quantidade de vitorias
+                $totalLoss = $totalLoss + $array['champions'][$i]['stats']['totalSessionsLost']; //Quantidade de derrotas
+
+                $totalKill = $totalKill + $array['champions'][$i]['stats']['totalChampionKills']; //Quantidade de Homicidios
+                $totalDeath = $totalDeath + $array['champions'][$i]['stats']['totalDeathsPerSession']; //Quantidade de Mortas
+
+                $totalAssist = $totalAssist + $array['champions'][$i]['stats']['totalAssists']; //Quantidade de assistencias.
+            }
+
+
+            $mediaKill = number_format($totalKill/$totalGames,1);
+            $mediaDeath = number_format($totalDeath/$totalGames,1);
+            $mediaAssist = number_format($totalAssist/$totalGames,1);
+
+            echo json_encode(
+                array(
+                    "games" => $totalGames,
+                    "wins" => $totalWins,
+                    "loss" => $totalLoss,
+                    "kill" => $totalKill,
+                    "death" => $totalDeath,
+                    "assist" => $totalAssist,
+                    "K" => $mediaKill,
+                    "D" => $mediaDeath,
+                    "A" => $mediaAssist
+                )
+            );
+
         }else{
             echo json_encode(
                 array(
@@ -598,6 +643,11 @@
         }
 
     }
+
+    function getRankedChamp($idPlayer, $idChamp){
+
+    }
+
 
     function getWins($idPlayer){
         $key = $GLOBALS['key'];
@@ -623,6 +673,15 @@
                     $teamLosses = $teamLosses + $json['playerStatSummaries'][$i]['losses'];
                 }
             }
+
+            echo json_encode(
+                array(
+                    "normal" => $normalWins,
+                    "solo" => $soloWins,
+                    "team" => $teamWins,
+                    "losers" => $teamLosses
+                )
+            );
 
 
         }
