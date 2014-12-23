@@ -20,7 +20,7 @@
 	$app = new \Slim\Slim();
 
     $app->post('/getMasteriesPoints/', 'getMasteriesPoints');
-    $app->post('/getLeague/', 'getLeague');
+
     $app->post('/getChampion/', 'getChampion');
     $app->post('/getNameChampion/','getNameChampion');
 
@@ -32,31 +32,64 @@
 		echo 'Hi, our e-mail: hello@lolrift.com.br';
 	});
 
+    $app->get('/getLeague/:id', 'getLeague');
     $app->get('/getRanked/:id/:name/','getRanked');
 	$app->get('/getSummonersIds/:name/', 'getSummonersIds');
 	$app->get('/getSummonersNames/:name/', 'getSummonersName');
-	$app->get('/getLeague/',function() {
-
-		echo 'Olá, envie uma requisição utilizando o METODO POST passando como parametro o SummonersIds dos jogadores no seguinte formato : <br><br>';
-		echo "<pre>";
-
-		print_r(
-			"
-					[
-					    {
-					        'id': '001'
-					    },
-					    {
-					        'id': '002'
-					    }
-					]
-			"
-			);
-
-	});
     $app->get('/getRankedStats/:idPlayer/', 'getRankedStats');
+    $app->get('/getRankedChamp/:idPlayer/:idChamp/', 'getRankedChamp');
     $app->get('/getWins/:id/','getWins');
+    $app->get('/main/:name','mainRequest');
 
+
+    //Main Request
+    function mainRequest($name){
+        $names = getSummonersName($name);
+        $ids = getSummonersIds($name);
+        $id = '';
+
+        echo '<pre>';
+        print_r($names);
+        print_r($ids);
+
+        $response = Unirest::post("http://localhost/lolrift/api/index.php/getChampion", array( "Accept" => "application/json" ),
+            json_encode(
+                array(
+                    array(
+                        "nome" => $name
+                    )
+                )
+            )
+        );
+
+        if(!empty($ids)) {
+
+            for ($i = 0; $i < sizeof($ids['teamOne']); $i++) {
+                if ($i == sizeof($ids['teamOne']) - 1) {
+                    $id .= $ids['teamOne'][$i];
+                } else {
+                    $id .= $ids['teamOne'][$i] . ",";
+                }
+            }
+
+            $league = Unirest::get("http://localhost/lolrift/api/index.php/getLeague/$id");
+            echo $league->raw_body;
+            $id = '';
+
+            for ($i = 0; $i < sizeof($ids['teamTwo']); $i++) {
+                if ($i == sizeof($ids['teamTwo']) - 1) {
+                    $id .= $ids['teamTwo'][$i];
+                } else {
+                    $id .= $ids['teamTwo'][$i] . ",";
+                }
+            }
+
+            $league = Unirest::get("http://localhost/lolrift/api/index.php/getLeague/$id");
+            echo $league->raw_body;
+
+        }
+
+    }
 
 	//Recuper o nome de todos os jogadores da partida atual
 	function getSummonersName($namePlayer){
@@ -83,7 +116,6 @@
 
 		$json = json_decode(json_encode($response->body),true);
 
-
 		if(!isset($json['data']['error'])){
 			if(!empty($json['data']['game'])){
 
@@ -102,6 +134,7 @@
 					}
 
 			}
+            return $names;
 		}else{
 			echo json_encode(
 				array(
@@ -109,8 +142,6 @@
 				)
 			);
 		}
-
-        return $names;
 
 	}
 
@@ -132,8 +163,6 @@
         }
 
         $nomes = getSummonersName($nomeFormatado);
-        echo '<pre>';
-        print_r($nomes);
 
 
 		$response = Unirest::get("https://spectator-league-of-legends-v1.p.mashape.com/lol/br/v1/spectator/by-name/$nomeFormatado",
@@ -161,8 +190,6 @@
 						$i++;
 					}
 
-					echo '<pre>';
-					print_r($ids);
 			}
 		}else{
 			echo json_encode(
@@ -276,7 +303,6 @@
                     "status" => "404",
                     "mensagem" => "Eastamos com problema na utilização da API"
                 ));
-
             }
         }
 
@@ -284,21 +310,8 @@
         print_r($champions);
     }
 
-	function getLeague(){
+	function getLeague($ids){
 		//Recebe a requisição com os SummonersIds de todos os jogadores da partida
-		
-		/*
-			Estrutura da Requisição:
-
-			[
-			    {
-			        "id": "001"
-			    },
-			    {
-			        "id": "002"
-			    }
-			]
-		*/
 
 		global $app;
 		$request = $app->request();
@@ -316,16 +329,6 @@
 			Faz com que os SummonersIds sejam separados por ponto e virgula
 		*/
 
-		$ids = "";
-
-		for($i = 0; $i < sizeof($data); $i++){
-			if($i == sizeof($data) - 1) {
-				$ids .= $data[$i]['id'];
-			}else{
-				$ids .= $data[$i]['id'].",";
-			}
-		}
-
 		$response = Unirest::get("https://br.api.pvp.net/api/lol/br/v2.5/league/by-summoner/$ids?api_key=$key");
 
 
@@ -335,33 +338,45 @@
 			$json = json_decode(json_encode($response->body),true);
 			$x = 0;
 
-			for($i = 0; $i < sizeof($data); $i++) {
+            if($json['status']['status_code'] != 503) {
 
-				//Aqui eu busco as principais informações de todos os jogadores
-				foreach($json[$data[$i]['id']][0]['entries'] as $key => $value){
-                      $tier = $json[$data[$i]['id']][0]['tier'];
+                for ($i = 0; $i < sizeof($data); $i++) {
 
-				      if($value['playerOrTeamId'] == $data[$i]['id']){
+                    //Aqui eu busco as principais informações de todos os jogadores
+                    foreach ($json[$data[$i]['id']][0]['entries'] as $key => $value) {
+                        $tier = $json[$data[$i]['id']][0]['tier'];
 
-				      		$leagues[$x] = array (
-                                    'tier' => $tier,
-				      				'playerOrTeamId' => $value['playerOrTeamId'],
-				      				'playerOrTeamName' => $value['playerOrTeamName'],
-				      				'division' => $value['division'],
-				      				'leaguePoints' => $value['leaguePoints'],
-				      				'wins' => $value['wins'],
-				      				'isHotStreak' => $value['isHotStreak'],
-				      				'isVeteran' => $value['isVeteran'],
-				      				'isFreshBlood' => $value['isFreshBlood'],
-				      				'isInactive' => $value['isInactive']
-				      		);
+                        if ($value['playerOrTeamId'] == $data[$i]['id']) {
 
-				      		$x++;
-				      }
-				}
+                            $leagues[$x] = array(
+                                'tier' => $tier,
+                                'playerOrTeamId' => $value['playerOrTeamId'],
+                                'playerOrTeamName' => $value['playerOrTeamName'],
+                                'division' => $value['division'],
+                                'leaguePoints' => $value['leaguePoints'],
+                                'wins' => $value['wins'],
+                                'isHotStreak' => $value['isHotStreak'],
+                                'isVeteran' => $value['isVeteran'],
+                                'isFreshBlood' => $value['isFreshBlood'],
+                                'isInactive' => $value['isInactive']
+                            );
 
-			}
-			print_r($leagues);
+                            $x++;
+                        }
+                    }
+
+                }
+                echo json_encode($leagues);
+            }else{
+                echo json_encode(
+                  array(
+                      "status" => 503,
+                      "mensagem" => "Serviço Indisponivel"
+                  )
+                );
+            }
+
+
 		}
 
 	}
@@ -596,7 +611,7 @@
 
 
         $key = $GLOBALS['key'];
-        if(!empty($idPlayer) && !empty($idChamp)){
+        if(!empty($idPlayer)){
             $html = file_get_html("https://br.api.pvp.net/api/lol/br/v1.3/stats/by-summoner/$idPlayer/ranked?season=SEASON4&api_key=$key");
             $array = json_decode($html,true);
             //echo '<pre>';
@@ -645,7 +660,61 @@
     }
 
     function getRankedChamp($idPlayer, $idChamp){
+        $totalGames = 0;
+        $totalWins = 0;
+        $totalLoss = 0;
+        $totalKill = 0;
+        $totalDeath = 0;
+        $totalAssist = 0;
 
+
+        $key = $GLOBALS['key'];
+        if(!empty($idPlayer)){
+            $html = file_get_html("https://br.api.pvp.net/api/lol/br/v1.3/stats/by-summoner/$idPlayer/ranked?season=SEASON4&api_key=$key");
+            $array = json_decode($html,true);
+
+            for($i = 0; $i < sizeof($array['champions']); $i++){
+
+                if($array['champions'][$i]['id'] == $idChamp) {
+
+                    $totalGames = $totalGames + $array['champions'][$i]['stats']['totalSessionsPlayed']; //Quantidade de partidas jogadas
+                    $totalWins = $totalWins + $array['champions'][$i]['stats']['totalSessionsWon']; //Quantidade de vitorias
+                    $totalLoss = $totalLoss + $array['champions'][$i]['stats']['totalSessionsLost']; //Quantidade de derrotas
+
+                    $totalKill = $totalKill + $array['champions'][$i]['stats']['totalChampionKills']; //Quantidade de Homicidios
+                    $totalDeath = $totalDeath + $array['champions'][$i]['stats']['totalDeathsPerSession']; //Quantidade de Mortas
+
+                    $totalAssist = $totalAssist + $array['champions'][$i]['stats']['totalAssists']; //Quantidade de assistencias.
+                }
+            }
+
+
+            $mediaKill = number_format($totalKill/$totalGames,1);
+            $mediaDeath = number_format($totalDeath/$totalGames,1);
+            $mediaAssist = number_format($totalAssist/$totalGames,1);
+
+            echo json_encode(
+                array(
+                    "games" => $totalGames,
+                    "wins" => $totalWins,
+                    "loss" => $totalLoss,
+                    "kill" => $totalKill,
+                    "death" => $totalDeath,
+                    "assist" => $totalAssist,
+                    "K" => $mediaKill,
+                    "D" => $mediaDeath,
+                    "A" => $mediaAssist
+                )
+            );
+
+        }else{
+            echo json_encode(
+                array(
+                    "status" => 404,
+                    "mensagem" => "Forneeca todos os parametros, id do player e id do campeão"
+                )
+            );
+        }
     }
 
 
