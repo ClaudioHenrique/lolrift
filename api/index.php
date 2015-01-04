@@ -62,30 +62,40 @@
             )
         );
 
+        $array =  json_decode($response->raw_body,true);
+
+        /*
+        if(!empty($array)){
+
+            for($i = 0; $i < sizeof($array['teamOne']); $i++){
+                $idChampion = $array['teamOne'][$i]['championId'];
+                $namePlayer = $array['teamOne'][$i]['summonerInternalName'];
+                $ranked = Unirest::get("http://localhost/lolrift/api/index.php/getRanked/$idChampion/$namePlayer");
+                echo $ranked->raw_body.'<br>';
+            }
+
+            for($i = 0; $i < sizeof($array['teamTwo']); $i++){
+                $idChampion = $array['teamTwo'][$i]['championId'];
+                $namePlayer = $array['teamTwo'][$i]['summonerInternalName'];
+                $ranked = Unirest::get("http://localhost/lolrift/api/index.php/getRanked/$idChampion/$namePlayer");
+                echo $ranked->raw_body.'<br>';
+            }
+        }
+        */
+
         if(!empty($ids)) {
 
             for ($i = 0; $i < sizeof($ids['teamOne']); $i++) {
-                if ($i == sizeof($ids['teamOne']) - 1) {
-                    $id .= $ids['teamOne'][$i];
-                } else {
-                    $id .= $ids['teamOne'][$i] . ",";
-                }
+                $id = $ids['teamOne'][$i];
+                $league = Unirest::get("http://localhost/lolrift/api/index.php/getLeague/$id");
+                echo $league->raw_body;
             }
-
-            $league = Unirest::get("http://localhost/lolrift/api/index.php/getLeague/$id");
-            echo $league->raw_body;
-            $id = '';
 
             for ($i = 0; $i < sizeof($ids['teamTwo']); $i++) {
-                if ($i == sizeof($ids['teamTwo']) - 1) {
-                    $id .= $ids['teamTwo'][$i];
-                } else {
-                    $id .= $ids['teamTwo'][$i] . ",";
-                }
+                $id = $ids['teamOne'][$i];
+                $league = Unirest::get("http://localhost/lolrift/api/index.php/getLeague/$id");
+                echo $league->raw_body;
             }
-
-            $league = Unirest::get("http://localhost/lolrift/api/index.php/getLeague/$id");
-            echo $league->raw_body;
 
         }
 
@@ -203,7 +213,7 @@
 	
 	}
 
-    //Inforomo o nome do Player e recupero o seu melhor campeão
+    //Inforomo o nome do Player e recupero o melhor campeão de todos os players da partida
 	function getChampion(){
 
 		$internalName = array();
@@ -306,12 +316,11 @@
             }
         }
 
-        echo '<pre>';
-        print_r($champions);
+        echo json_encode($champions);
     }
 
-	function getLeague($ids){
-		//Recebe a requisição com os SummonersIds de todos os jogadores da partida
+    //Informe o id do Player e recupero informações da league
+	function getLeague($id){
 
 		global $app;
 		$request = $app->request();
@@ -326,10 +335,14 @@
 		
 
 		/*
-			Faz com que os SummonersIds sejam separados por ponto e virgula
+			Faço uma requisição a API
 		*/
 
-		$response = Unirest::get("https://br.api.pvp.net/api/lol/br/v2.5/league/by-summoner/$ids?api_key=$key");
+        try{
+            $response = Unirest::get("https://br.api.pvp.net/api/lol/br/v2.5/league/by-summoner/$id?api_key=$key");
+        }catch(Exception $e){
+            echo $e->getCode();
+        }
 
 
 		if(!empty($response)){
@@ -338,15 +351,10 @@
 			$json = json_decode(json_encode($response->body),true);
 			$x = 0;
 
-            if($json['status']['status_code'] != 503) {
-
-                for ($i = 0; $i < sizeof($data); $i++) {
-
+            if(isset($json['status']['status_code'])) {
                     //Aqui eu busco as principais informações de todos os jogadores
-                    foreach ($json[$data[$i]['id']][0]['entries'] as $key => $value) {
-                        $tier = $json[$data[$i]['id']][0]['tier'];
-
-                        if ($value['playerOrTeamId'] == $data[$i]['id']) {
+                    foreach ($json[$id][0]['entries'] as $key => $value) {
+                        $tier = $json[$id][0]['tier'];
 
                             $leagues[$x] = array(
                                 'tier' => $tier,
@@ -362,10 +370,8 @@
                             );
 
                             $x++;
-                        }
-                    }
 
-                }
+                    }
                 echo json_encode($leagues);
             }else{
                 echo json_encode(
@@ -376,9 +382,7 @@
                 );
             }
 
-
 		}
-
 	}
 
 	function getMasteriesPoints(){
@@ -539,7 +543,7 @@
             }
     }
 
-    //Verifico se o player esta rankeado, informando o nome do seu melhor campeão e o nome do jogador
+    //Verifico se o player esta rankeado, informando o id do seu melhor campeão e o nome do jogador
     function getRanked($idChampion, $namePlayer){
         //Status do rankeamento
         $ranked = false;
